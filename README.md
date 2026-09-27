@@ -1,5 +1,9 @@
 # FOCUS TIMER
 
+### ▶ https://ibrahimaljabouri1562007com-sudo.github.io/Focus-timer/
+
+**That link is the app.** Same URL on the phone and at the desk — open it anywhere.
+
 A locked 50/5 cadence timer. Plan once, then it runs itself until the mission is over.
 Black · silver · red. No pause, no stop, no reset.
 
@@ -7,16 +11,16 @@ Black · silver · red. No pause, no stop, no reset.
 
 ## Launch
 
-Double-click **`FOCUS.cmd`**.
+**Desk** — double-click **`FOCUS.cmd`**. It opens the hosted link in a chrome-less Chrome
+app window, so the countdown shows in the **window title and the taskbar** even when the
+window is shrunk down beside the chat. No local server is involved any more.
 
-It serves this folder on port `5758` and opens the timer in a chrome-less Chrome app
-window — so the countdown shows in the **window title and the taskbar** even when the
-window is shrunk down beside the chat. Re-running it reuses the same server, it never
-stacks a second one.
+**Phone** — open the link and use *Add to Home Screen*. It launches fullscreen with its
+own icon.
 
-Also reachable through the workspace preview server at
-`http://localhost:5757/Projects/Focus Timer/` — but that one is a *different origin*, so
-it keeps its own separate mission counter and its own in-flight mission.
+> The app is served from GitHub Pages out of the `main` branch of
+> [`Focus-timer`](https://github.com/ibrahimaljabouri1562007com-sudo/Focus-timer).
+> `FOCUS.cmd` is deliberately **not** in that repo — it holds a local Windows path.
 
 ---
 
