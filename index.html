@@ -465,8 +465,10 @@ let tick    = null;
    flushed to Supabase whenever it can be. Nothing in here can block
    or break the timer: the mission engine never calls it.
    ════════════════════════════════════════════════════════════════ */
-const SUPA_URL = '__SUPABASE_URL__';
-const SUPA_KEY = '__SUPABASE_ANON_KEY__';
+/* the publishable key is meant to ship in the page — row level security on
+   focus_objectives is what actually protects the rows, not this string */
+const SUPA_URL = 'https://hddqykzjlgmkpqvzejbl.supabase.co';
+const SUPA_KEY = 'sb_publishable_nAR1H8RKN7eGG7lKS2V7yg_jc_5w77c';
 const TABLE    = 'focus_objectives';
 const OUTBOX   = 'ioi.focus.outbox.v1';
 
