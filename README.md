@@ -46,9 +46,26 @@ options instead of a blank field.
 **Launch rule:** any *pending* objectives → the objectives list is the first screen.
 None → straight to the plan screen.
 
-**Where the data lives:** `localStorage` under `ioi.focus.objectives.v1`, read and
-written only through the `Store` object in the script. Swapping that one object for a
-Supabase-backed version is the entire cloud migration — nothing above it changes.
+### Sync
+
+Sign in once per device (the **SIGN IN TO SYNC** link on the objectives screen) and the
+list follows you between phone and desk.
+
+- **Local-first.** Reads answer from a local mirror, so the list paints instantly and
+  still works with no signal. Writes land locally, then queue in an outbox that flushes
+  when it can — a dropped connection can never lose a verdict.
+- **The timer never touches the network.** If Supabase or the CDN is unreachable the
+  app falls back to local-only and the cadence runs exactly the same. Losing WiFi is
+  not an escape hatch.
+- **On launch** the app waits up to 2.5s for a sync before choosing which screen to
+  show, so objectives added on the phone decide what greets you at the desk.
+- Objectives written while signed out are carried up to the account on first sign-in.
+
+**Storage:** Postgres table `focus_objectives` in Supabase, guarded by row level
+security (`auth.uid() = user_id`) — every row is scoped to its owner. The publishable
+key in `index.html` is public **by design**: signed out, the API returns zero rows and
+refuses writes. The local mirror lives in `localStorage` under
+`ioi.focus.objectives.v1`, with the outbox at `ioi.focus.outbox.v1`.
 
 ---
 
