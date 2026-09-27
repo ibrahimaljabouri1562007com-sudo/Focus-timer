@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FOCUS TIMER</title>
+<meta name="theme-color" content="#08090a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Focus">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2308090a'/%3E%3Ccircle cx='16' cy='17' r='9' fill='none' stroke='%23c9ced4' stroke-width='2'/%3E%3Cpath d='M16 12v5' stroke='%23e0132f' stroke-width='2' stroke-linecap='square'/%3E%3Cpath d='M12 4h8' stroke='%23c9ced4' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#08090a;
+  /* legibility pass: the ground stays black, the foreground is lifted.
+     every value below is measured against --void, not eyeballed. */
+  --line:rgba(208,215,222,.24);
+  --line-soft:rgba(208,215,222,.14);
+  --paper:#eef2f5;                 /* headline text            ~17:1 */
+  --silver:#dde3e8;               /* primary text             ~14:1 */
+  --dim:#a9b1b8;                  /* secondary text            ~8:1 */
+  --faint:#7e868d;                /* tertiary / placeholder    ~5:1 */
+  --red:#e0132f;
+  --red-hot:#ff2b45;
+  --accent:var(--red);
+  --disp:'Barlow Condensed','Oswald','Arial Narrow',system-ui,sans-serif;
+  --ui:'Barlow','Inter',system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--void);
+  color:var(--silver);
+  font-family:var(--ui);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+/* ---- ground: vignette + scanline grain ---- */
+.ground{position:fixed;inset:0;pointer-events:none;z-index:0}
+.ground::before{
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.035),transparent 55%),
+             radial-gradient(90% 70% at 50% 120%,rgba(200,16,46,.05),transparent 60%);
+}
+.ground::after{
+  content:"";position:absolute;inset:0;opacity:.18;
+  background:repeating-linear-gradient(to bottom,rgba(255,255,255,.018) 0 1px,transparent 1px 3px);
+}
+.frame{position:fixed;inset:14px;pointer-events:none;z-index:1}
+.frame i{position:absolute;width:14px;height:14px;border:1px solid var(--line)}
+.frame i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0}
+.frame i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0}
+.frame i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0}
+.frame i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0}
+
+.shell{position:relative;z-index:2;height:100%;display:flex;flex-direction:column}
+
+/* ---- micro type ---- */
+.mk{font-family:var(--ui);font-size:12px;font-weight:500;letter-spacing:.19em;text-transform:uppercase;
+  color:var(--dim);text-indent:.19em}
+.mk-b{color:var(--silver)}
+
+/* ---- top bar ---- */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:22px 34px 12px;border-bottom:1px solid var(--line-soft);flex:0 0 auto;
+}
+.brand{display:flex;align-items:center}
+.brand span{font-family:var(--ui);font-size:12px;font-weight:500;letter-spacing:.26em;color:var(--dim);text-transform:uppercase}
+.status{display:flex;align-items:center;gap:9px}
+.status .dot{width:4px;height:4px;background:var(--accent);transition:background .6s}
+.status .dot.live{animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.18}}
+
+main{flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:10px 34px;min-height:0}
+.screen{display:none;width:100%;max-width:720px}
+.screen.on{display:block;animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ---- nav between plan and objectives ---- */
+.navline{margin-bottom:20px}
+.navrow{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.navlink.live{color:var(--paper)}
+.navlink.live::before{content:"";display:inline-block;width:5px;height:5px;background:var(--red-hot);
+  margin-right:9px;vertical-align:middle}
+
+/* ---- sync screen ---- */
+#authEmail,#authPass{
+  width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);
+  font-family:var(--disp);font-weight:500;font-size:28px;letter-spacing:.05em;
+  color:var(--paper);padding:4px 2px 10px;outline:0;transition:border-color .3s;
+}
+#authEmail::placeholder,#authPass::placeholder{color:var(--faint);letter-spacing:.12em;font-size:22px}
+#authEmail:focus,#authPass:focus{border-bottom-color:var(--accent)}
+.authstate{text-align:center;padding:14px 0}
+.authstate b{display:block;font-family:var(--disp);font-size:clamp(22px,4vw,32px);font-weight:500;
+  letter-spacing:.1em;color:var(--paper);margin-top:12px;word-break:break-all}
+#authMsg.bad{color:var(--red-hot)}
+.navlink{
+  background:transparent;border:0;padding:4px 0;cursor:pointer;
+  font-family:var(--ui);font-size:12px;font-weight:500;letter-spacing:.19em;
+  text-transform:uppercase;color:var(--dim);transition:color .2s;
+}
+.navlink:hover{color:var(--paper)}
+
+.head-rule{display:flex;align-items:center;gap:14px;margin-bottom:34px}
+.head-rule .l{flex:1;height:1px;background:var(--line)}
+.head-rule .t{font-family:var(--ui);font-size:12px;font-weight:500;letter-spacing:.26em;color:var(--silver);text-transform:uppercase;white-space:nowrap}
+
+/* ================= OBJECTIVES ================= */
+.objlist{max-height:46vh;overflow-y:auto;overflow-x:hidden;margin-bottom:6px}
+.objlist::-webkit-scrollbar{width:2px}
+.objlist::-webkit-scrollbar-thumb{background:var(--line)}
+
+.obj{display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--line-soft)}
+.obj .pick{
+  flex:1;display:flex;align-items:center;gap:14px;min-height:54px;
+  background:transparent;border:0;padding:8px 0;cursor:pointer;text-align:left;
+  font-family:var(--disp);font-size:clamp(21px,2.8vw,25px);font-weight:500;letter-spacing:.085em;
+  text-transform:uppercase;color:var(--paper);transition:color .2s;min-width:0;
+}
+.obj .pick:hover{color:#fff}
+.obj .mark{flex:0 0 auto;display:grid;place-items:center;width:18px;height:18px;color:var(--dim);transition:color .2s}
+.obj .mark svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:square;stroke-linejoin:miter}
+.obj .pick:hover .mark{color:var(--accent)}
+.obj .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.obj .del{
+  flex:0 0 auto;background:transparent;border:0;cursor:pointer;padding:6px 2px 6px 10px;
+  font-family:var(--disp);font-size:22px;line-height:1;color:rgba(208,215,222,.38);transition:color .2s;
+}
+.obj .del:hover{color:var(--red-hot)}
+
+/* settled objectives sink and dim */
+.obj.settled{border-bottom-color:transparent}
+.obj.settled .pick{cursor:default;color:var(--faint);font-size:clamp(18px,2.4vw,21px);min-height:44px}
+.obj.settled .pick:hover{color:var(--faint)}
+.obj.settled .pick:hover .mark{color:inherit}
+.obj.settled .mark.done{color:#98a0a7}
+.obj.settled .mark.failed{color:rgba(224,19,47,.85)}
+.settled-rule{height:1px;background:var(--line-soft);margin:16px 0 4px}
+
+.objadd{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding-bottom:2px}
+#objIn{
+  flex:1;min-width:0;background:transparent;border:0;outline:0;padding:12px 2px;
+  font-family:var(--disp);font-size:clamp(20px,2.6vw,23px);font-weight:500;letter-spacing:.08em;
+  color:var(--paper);text-transform:uppercase;caret-color:var(--red-hot);
+}
+#objIn::placeholder{color:var(--faint);letter-spacing:.16em}
+.objadd-btn{
+  flex:0 0 auto;width:34px;height:34px;background:transparent;border:1px solid var(--line);
+  color:var(--silver);font-family:var(--disp);font-size:22px;line-height:1;cursor:pointer;
+  display:grid;place-items:center;transition:all .2s;
+}
+.objadd-btn:hover{border-color:var(--accent);color:var(--silver)}
+.objadd-btn:disabled{opacity:.25;cursor:not-allowed;border-color:var(--line-soft)}
+.emptyline{padding:26px 0 30px;text-align:center}
+
+/* ================= PLAN ================= */
+.field{margin-bottom:34px}
+.field .idx{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.field .idx b{font-family:var(--disp);font-size:14px;letter-spacing:.12em;color:var(--red-hot);font-weight:600}
+
+input#name{
+  width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);
+  font-family:var(--disp);font-weight:500;font-size:34px;letter-spacing:.05em;
+  color:var(--paper);text-transform:uppercase;padding:4px 2px 10px;outline:0;
+  transition:border-color .3s;
+}
+input#name::placeholder{color:var(--faint);letter-spacing:.14em;font-size:26px}
+input#name:focus{border-bottom-color:var(--accent)}
+
+.dur{display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.step{
+  width:34px;height:34px;flex:0 0 auto;background:transparent;border:1px solid var(--line);
+  color:var(--silver);font-family:var(--disp);font-size:22px;line-height:1;cursor:pointer;
+  transition:all .2s;display:grid;place-items:center;
+}
+.step:hover{border-color:var(--accent);color:var(--silver)}
+.step:disabled{opacity:.25;cursor:not-allowed;border-color:var(--line-soft)}
+.dur .val{font-family:var(--disp);font-size:44px;font-weight:500;letter-spacing:.03em;color:var(--paper);
+  min-width:104px;display:flex;align-items:baseline;justify-content:center;cursor:text}
+.dur .val em{font-style:normal;color:var(--accent)}
+#durIn{
+  font:inherit;letter-spacing:inherit;color:var(--silver);background:transparent;
+  border:0;border-bottom:1px dashed rgba(208,215,222,.6);
+  /* width is measured from the glyph in drawPlan(); the right padding holds the
+     number clear of the .50 so N and the dot never touch */
+  width:30px;padding:0 6px 3px 0;text-align:right;outline:0;cursor:text;
+  caret-color:var(--red-hot);transition:border-color .2s,color .2s;
+}
+#durIn::placeholder{color:var(--faint);opacity:1}
+#durIn:hover{border-bottom-color:var(--silver)}
+#durIn:focus{border-bottom-style:solid;border-bottom-color:var(--red-hot)}
+.dur .meta{flex:1;text-align:right}
+
+.engage{
+  margin-top:8px;width:100%;background:transparent;border:1px solid var(--accent);
+  color:var(--red-hot);font-family:var(--disp);font-size:19px;font-weight:600;letter-spacing:.3em;
+  text-transform:uppercase;padding:17px 0 15px;cursor:pointer;position:relative;overflow:hidden;
+  transition:color .25s;isolation:isolate;
+}
+.engage::after{content:"";position:absolute;inset:0;background:var(--red);transform:scaleX(0);transform-origin:left;transition:transform .35s cubic-bezier(.2,.7,.2,1);z-index:-1}
+.engage:hover{color:#fff}
+.engage:hover::after{transform:scaleX(1)}
+.engage span{position:relative;z-index:1}
+.engage:disabled{border-color:var(--line);color:var(--faint);cursor:not-allowed}
+.engage:disabled::after{display:none}
+.lock-note{margin-top:13px;text-align:center}
+
+/* ================= RUN ================= */
+.run-head{text-align:center;margin-bottom:clamp(14px,3.5vh,32px)}
+.run-head .mk{font-size:clamp(16px,2.9vw,21px);font-weight:500;letter-spacing:.26em;text-indent:.26em;color:var(--silver)}
+.run-head b{display:block;font-family:var(--disp);font-size:clamp(30px,6vw,54px);font-weight:400;
+  letter-spacing:.14em;color:var(--paper);text-transform:uppercase;margin-top:10px;line-height:1.1;
+  text-indent:.2em;word-break:break-word}
+
+.clockwrap{position:relative;text-align:center;padding:clamp(10px,2.4vh,20px) 0}
+.tag{font-family:var(--disp);font-size:clamp(24px,5vw,36px);font-weight:600;letter-spacing:.26em;
+  color:var(--accent);text-transform:uppercase;transition:color .6s;text-indent:.26em;
+  margin-top:clamp(8px,1.8vh,16px)}
+#clock{font-family:var(--disp);font-weight:400;font-size:clamp(84px,19vw,190px);line-height:.86;
+  color:var(--paper);white-space:nowrap}
+#clock .d{display:inline-block;width:.56em;text-align:center}
+#clock .c{display:inline-block;width:.26em;text-align:center;color:var(--faint)}
+
+/* ================= VERDICT / DEBRIEF ================= */
+.done{text-align:center}
+.done .over{font-family:var(--disp);font-size:clamp(28px,6.6vw,54px);font-weight:400;letter-spacing:.2em;
+  color:var(--paper);text-transform:uppercase;line-height:1.05}
+.done .over em{font-style:normal;color:var(--accent)}
+.done .nm{font-family:var(--disp);font-size:clamp(18px,2.8vw,23px);font-weight:500;letter-spacing:.16em;color:var(--dim);
+  text-transform:uppercase;margin-top:18px}
+.done .stats{display:flex;justify-content:center;gap:clamp(22px,6vw,56px);margin:38px 0 44px;flex-wrap:wrap}
+.done .stats .s b{display:block;font-family:var(--disp);font-size:clamp(24px,4.4vw,36px);font-weight:400;
+  color:var(--paper);margin-bottom:7px;letter-spacing:.04em}
+.acts{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.act{background:transparent;border:1px solid var(--line);color:var(--silver);font-family:var(--disp);
+  font-size:16px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;padding:14px 30px;cursor:pointer;transition:all .25s}
+.act:hover{color:var(--silver);border-color:var(--silver)}
+.act.pri{border-color:var(--accent);color:var(--red-hot)}
+.act.pri:hover{background:var(--red);color:#fff;border-color:var(--red)}
+/* the verdict pair is deliberately unbiased: same weight, no default */
+.vpair{display:flex;gap:14px;justify-content:center;margin-top:clamp(30px,6vh,48px)}
+.vbtn{min-width:140px;background:transparent;border:1px solid var(--line);color:var(--silver);
+  font-family:var(--disp);font-size:20px;font-weight:500;letter-spacing:.24em;text-transform:uppercase;
+  padding:16px 0 14px;cursor:pointer;transition:all .25s;text-indent:.24em}
+#vYes:hover{color:#fff;border-color:var(--silver)}
+#vNo:hover{color:#fff;border-color:var(--red);background:rgba(200,16,46,.16)}
+
+/* recovery theme swap: red stands down, silver takes over */
+body.rec{--accent:var(--silver)}
+body.rec .status .dot{background:var(--silver)}
+
+/* boundary flash */
+#flash{position:fixed;inset:0;z-index:50;pointer-events:none;opacity:0;
+  box-shadow:inset 0 0 0 2px var(--red-hot),inset 0 0 90px rgba(200,16,46,.3)}
+#flash.go{animation:fl 1.5s ease-out}
+#flash.silver{box-shadow:inset 0 0 0 2px rgba(201,206,212,.8),inset 0 0 90px rgba(201,206,212,.14)}
+@keyframes fl{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
+
+@media (max-width:620px){
+  header,main{padding-left:20px;padding-right:20px}
+  .mk{letter-spacing:.16em;font-size:11.5px}
+  .dur{flex-wrap:wrap;gap:14px}
+  .dur .meta{flex-basis:100%;text-align:left}
+  input#name{font-size:26px}
+  input#name::placeholder{font-size:20px}
+  .frame{inset:8px}
+  .objlist{max-height:52vh}
+  .vbtn{min-width:120px}
+}
+@media (max-height:540px){
+  header{padding-top:14px;padding-bottom:8px}
+  .head-rule{margin-bottom:22px}
+  .field{margin-bottom:20px}
+  .done .stats{margin:22px 0 26px}
+  .objlist{max-height:40vh}
+}
+</style>
+</head>
+<body>
+<div class="ground"></div>
+<div class="frame"><i></i><i></i><i></i><i></i></div>
+<div id="flash"></div>
+
+<div class="shell">
+  <header>
+    <div class="brand"><span>Focus&nbsp;Timer</span></div>
+    <div class="status"><div class="dot" id="dot"></div><div class="mk mk-b" id="statusTxt">Planning</div></div>
+  </header>
+
+  <main>
+    <!-- ============ SCREEN : OBJECTIVES ============ -->
+    <section class="screen" id="scObj">
+      <div class="navline navrow">
+        <button class="navlink" id="toPlan">Free mission &rarr;</button>
+        <button class="navlink" id="toAuth">Sign in to sync</button>
+      </div>
+      <div class="head-rule"><div class="l"></div><div class="t">Objectives</div><div class="l"></div></div>
+      <div class="objlist" id="objList"></div>
+      <div class="objadd">
+        <input id="objIn" maxlength="48" placeholder="Add an objective" autocomplete="off" spellcheck="false">
+        <button class="objadd-btn" id="objAdd" aria-label="add objective" disabled>+</button>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN : SYNC / SIGN IN ============ -->
+    <section class="screen" id="scAuth">
+      <div class="navline"><button class="navlink" id="authBack">&larr; Objectives</button></div>
+      <div class="head-rule"><div class="l"></div><div class="t">Sync</div><div class="l"></div></div>
+
+      <div id="authOut">
+        <div class="field">
+          <div class="idx"><b>01</b><div class="mk">Account</div></div>
+          <input id="authEmail" type="email" placeholder="Email" autocomplete="username" spellcheck="false">
+        </div>
+        <div class="field">
+          <div class="idx"><b>02</b><div class="mk">Password</div></div>
+          <input id="authPass" type="password" placeholder="Password" autocomplete="current-password">
+        </div>
+        <button class="engage" id="authGo"><span>Sign in</span></button>
+        <div class="lock-note mk" id="authMsg">Objectives sync across your devices</div>
+      </div>
+
+      <div id="authIn" hidden>
+        <div class="authstate">
+          <div class="mk">Signed in as</div>
+          <b id="authWho">&mdash;</b>
+        </div>
+        <div class="acts" style="margin-top:36px">
+          <button class="act" id="authOutBtn">Sign out</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN : PLAN ============ -->
+    <section class="screen" id="scPlan">
+      <div class="navline"><button class="navlink" id="toObj">&larr; Objectives</button></div>
+      <div class="head-rule"><div class="l"></div><div class="t">Mission Briefing</div><div class="l"></div></div>
+
+      <div class="field">
+        <div class="idx"><b>01</b><div class="mk" id="desigLbl">Designation</div></div>
+        <input id="name" maxlength="38" placeholder="Name the mission" autocomplete="off" spellcheck="false">
+      </div>
+
+      <div class="field">
+        <div class="idx"><b>02</b><div class="mk">Duration</div></div>
+        <div class="dur">
+          <button class="step" id="minus" aria-label="fewer blocks">&#8722;</button>
+          <div class="val" id="durVal"><input id="durIn" type="text" inputmode="numeric" maxlength="2"
+            placeholder="N" autocomplete="off" spellcheck="false"
+            aria-label="how many 50 minute blocks"><em>.50</em></div>
+          <button class="step" id="plus" aria-label="more blocks">+</button>
+          <div class="meta">
+            <div class="mk mk-b" id="durTotal">Total &mdash;</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="engage" id="engage" disabled><span>Engage</span></button>
+      <div class="lock-note mk">No pause &middot; no stop &middot; no reset once engaged</div>
+    </section>
+
+    <!-- ============ SCREEN : RUN ============ -->
+    <section class="screen" id="scRun">
+      <div class="run-head">
+        <div class="mk">Mission <span id="mNo">01</span></div>
+        <b id="mName">&mdash;</b>
+      </div>
+      <div class="clockwrap">
+        <div id="clock">50:00</div>
+        <div class="tag" id="tag">W1.50</div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN : VERDICT ============ -->
+    <section class="screen" id="scVerdict">
+      <div class="done">
+        <div class="mk" style="margin-bottom:24px">Debrief</div>
+        <div class="over">Mission<br>accomplished&thinsp;<em>?</em></div>
+        <div class="nm" id="vName">&mdash;</div>
+        <div class="vpair">
+          <button class="vbtn" id="vYes">Yes</button>
+          <button class="vbtn" id="vNo">No</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN : DEBRIEF (free mission) ============ -->
+    <section class="screen" id="scDone">
+      <div class="done">
+        <div class="mk" style="margin-bottom:22px">Debrief</div>
+        <div class="over">Mission <em id="dNo">01</em><br>time is over</div>
+        <div class="nm" id="dName">&mdash;</div>
+        <div class="stats">
+          <div class="s"><b id="dBlocks">0</b><div class="mk">Blocks cleared</div></div>
+          <div class="s"><b id="dMins">0</b><div class="mk">Minutes focused</div></div>
+          <div class="s"><b id="dSpan">0</b><div class="mk">On the clock</div></div>
+        </div>
+        <div class="acts">
+          <button class="act pri" id="again">New mission</button>
+          <button class="act" id="close">Close</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+'use strict';
+/* ────────────────────────────────────────────────────────────────
+   FOCUS TIMER — 50/5 locked cadence, timestamp-driven.
+   Dev override: ?t=<work seconds>[&b=<break seconds>] for fast runs.
+   ──────────────────────────────────────────────────────────────── */
+const QS    = new URLSearchParams(location.search);
+const FAST  = Math.max(0, +QS.get('t') || 0);
+const FASTB = Math.max(0, +QS.get('b') || 0);
+const WORK  = FAST ? FAST : 50 * 60;
+const BREAK = FAST ? (FASTB || Math.max(2, Math.round(FAST / 10))) : 5 * 60;
+
+const KEY     = 'ioi.focus.v3';          // the in-flight mission
+const CNT     = 'ioi.focus.count.v3';    // mission numbering
+const PENDING = 'ioi.focus.pending.v1';  // a verdict owed
+const OBJS    = 'ioi.focus.objectives.v1';
+const MAXB    = 12;
+
+/* clear the earlier test state so no stale mission survives the redesign */
+try {
+  ['ioi.focus.v1', 'ioi.focus.count', 'ioi.focus.v2', 'ioi.focus.count.v2']
+    .forEach(function (k) { localStorage.removeItem(k); });
+} catch (e) {}
+
+const $ = function (id) { return document.getElementById(id); };
+const el = {
+  dot:$('dot'), status:$('statusTxt'),
+  obj:$('scObj'), plan:$('scPlan'), run:$('scRun'), verdict:$('scVerdict'), done:$('scDone'),
+  auth:$('scAuth'), authOut:$('authOut'), authIn:$('authIn'), authEmail:$('authEmail'),
+  authPass:$('authPass'), authGo:$('authGo'), authMsg:$('authMsg'), authWho:$('authWho'),
+  authBack:$('authBack'), authOutBtn:$('authOutBtn'), toAuth:$('toAuth'),
+  objList:$('objList'), objIn:$('objIn'), objAdd:$('objAdd'), toPlan:$('toPlan'), toObj:$('toObj'),
+  name:$('name'), desigLbl:$('desigLbl'), durVal:$('durVal'), durIn:$('durIn'), durTotal:$('durTotal'),
+  minus:$('minus'), plus:$('plus'), engage:$('engage'),
+  mNo:$('mNo'), mName:$('mName'), tag:$('tag'), clock:$('clock'),
+  vName:$('vName'), vYes:$('vYes'), vNo:$('vNo'),
+  dNo:$('dNo'), dName:$('dName'), dBlocks:$('dBlocks'), dMins:$('dMins'), dSpan:$('dSpan'),
+  again:$('again'), close:$('close'), flash:$('flash')
+};
+
+/* ── state ───────────────────────────────────────────────────── */
+let blocks  = 0;      // planned 50-min blocks; 0 = not chosen yet
+let mission = null;   // {no,name,blocks,startedAt,objId}
+let objId   = null;   // objective the plan screen is bound to
+let lastSeg = -1;
+let tick    = null;
+
+/* ════════════════════════════════════════════════════════════════
+   STORE — the only place objectives are read or written.
+
+   Local-first by design. Every read answers from a local mirror, so
+   the list paints instantly and still works with no network. Writes
+   land in the mirror immediately and are queued in an outbox that is
+   flushed to Supabase whenever it can be. Nothing in here can block
+   or break the timer: the mission engine never calls it.
+   ════════════════════════════════════════════════════════════════ */
+const SUPA_URL = '__SUPABASE_URL__';
+const SUPA_KEY = '__SUPABASE_ANON_KEY__';
+const TABLE    = 'focus_objectives';
+const OUTBOX   = 'ioi.focus.outbox.v1';
+
+const uuid = function () {
+  try { return crypto.randomUUID(); } catch (e) {}
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+};
+
+let sb = undefined;                     // undefined = not tried, false = unavailable
+async function supa() {
+  if (sb !== undefined) return sb;
+  if (SUPA_URL.indexOf('__') === 0 || SUPA_KEY.indexOf('__') === 0) { sb = false; return sb; }
+  try {
+    const m = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    sb = m.createClient(SUPA_URL, SUPA_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, storageKey: 'ioi.focus.auth' }
+    });
+  } catch (e) { sb = false; }           // offline or CDN blocked → local-only, silently
+  return sb;
+}
+async function session() {
+  const c = await supa();
+  if (!c) return null;
+  try { return (await c.auth.getSession()).data.session || null; } catch (e) { return null; }
+}
+
+const Store = {
+  cache: [],
+  _read: function () {
+    try { return JSON.parse(localStorage.getItem(OBJS) || '[]'); } catch (e) { return []; }
+  },
+  _write: function (rows) {
+    try { localStorage.setItem(OBJS, JSON.stringify(rows)); } catch (e) {}
+    this.cache = rows;
+  },
+  _outbox: function () {
+    try { return JSON.parse(localStorage.getItem(OUTBOX) || '[]'); } catch (e) { return []; }
+  },
+  _queue: function (op) {
+    const q = this._outbox();
+    q.push(op);
+    try { localStorage.setItem(OUTBOX, JSON.stringify(q)); } catch (e) {}
+    this.push();                        // fire and forget; failure just leaves it queued
+  },
+
+  /* reads always answer locally — instant, and correct offline */
+  list: function () { this.cache = this._read(); return Promise.resolve(this.cache); },
+  get:  function (id) {
+    return this._read().filter(function (o) { return o.id === id; })[0] || null;
+  },
+
+  add: function (name) {
+    const row = { id: uuid(), name: name, verdict: null, decided_at: null, created_at: Date.now() };
+    const rows = this._read(); rows.push(row); this._write(rows);
+    this._queue({ op: 'add', row: row });
+    return Promise.resolve(rows);
+  },
+  remove: function (id) {
+    this._write(this._read().filter(function (o) { return o.id !== id; }));
+    this._queue({ op: 'del', id: id });
+    return Promise.resolve(this.cache);
+  },
+  setVerdict: function (id, ok) {
+    const rows = this._read();
+    const row  = rows.filter(function (o) { return o.id === id; })[0];
+    if (row) {
+      row.verdict = !!ok; row.decided_at = Date.now();
+      this._write(rows);
+      this._queue({ op: 'verdict', id: id, ok: !!ok, decided_at: row.decided_at });
+    }
+    return Promise.resolve(this.cache);
+  },
+
+  /* flush the outbox; anything that fails stays queued for next time */
+  push: async function () {
+    const s = await session();
+    if (!s) return false;
+    const c = await supa();
+    let q = this._outbox();
+    while (q.length) {
+      const job = q[0];
+      try {
+        let r;
+        if (job.op === 'add') {
+          r = await c.from(TABLE).upsert({
+            id: job.row.id, user_id: s.user.id, name: job.row.name,
+            verdict: null, created_at: new Date(job.row.created_at).toISOString()
+          });
+        } else if (job.op === 'del') {
+          r = await c.from(TABLE).delete().eq('id', job.id);
+        } else {
+          r = await c.from(TABLE).update({
+            verdict: job.ok, decided_at: new Date(job.decided_at).toISOString()
+          }).eq('id', job.id);
+        }
+        if (r && r.error) throw r.error;
+      } catch (e) {
+        return false;                   // keep the queue, try again later
+      }
+      q.shift();
+      try { localStorage.setItem(OUTBOX, JSON.stringify(q)); } catch (e) {}
+    }
+    return true;
+  },
+
+  /* push local changes, then take the server as truth */
+  pull: async function () {
+    const s = await session();
+    if (!s) return false;
+    if (!(await this.push())) return false;
+    const c = await supa();
+    try {
+      const r = await c.from(TABLE).select('*').order('created_at', { ascending: true });
+      if (r.error) throw r.error;
+      this._write(r.data.map(function (o) {
+        return {
+          id: o.id, name: o.name, verdict: o.verdict,
+          decided_at: o.decided_at ? Date.parse(o.decided_at) : null,
+          created_at: Date.parse(o.created_at)
+        };
+      }));
+      return true;
+    } catch (e) { return false; }
+  },
+
+  /* sync in the background, then repaint if the list is on screen */
+  sync: async function () {
+    const ok = await this.pull();
+    if (ok && el.obj.classList.contains('on')) await renderObjectives();
+    /* a late sync can arrive after we already chose a greeting. if the user
+       hasn't touched anything, re-choose it now that the truth is in. */
+    if (ok && !mission && !loadPending() && el.plan.classList.contains('on')
+        && !el.name.value.trim() && !blocks) route();
+    markSync();
+    return ok;
+  },
+  /* first sign-in on a device: carry whatever was written offline up to the
+     account, so the first pull adds to it instead of wiping it */
+  adoptLocal: function () {
+    const queued = {};
+    this._outbox().forEach(function (j) { if (j.op === 'add') queued[j.row.id] = 1; });
+    const self = this;
+    this._read().forEach(function (row) {
+      if (queued[row.id]) return;
+      self._queue({ op: 'add', row: row });
+      if (row.verdict !== null && row.verdict !== undefined) {
+        self._queue({ op: 'verdict', id: row.id, ok: row.verdict,
+                      decided_at: row.decided_at || Date.now() });
+      }
+    });
+  },
+  wipeLocal: function () {
+    this._write([]);
+    try { localStorage.removeItem(OUTBOX); } catch (e) {}
+  }
+};
+const isPending = function (o) { return o.verdict === null || o.verdict === undefined; };
+
+/* ── schedule: W B W B ... W  (ends on work, never on a break) ── */
+function segments(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ kind:'w', block:i + 1, dur:WORK });
+    if (i < n - 1) out.push({ kind:'b', block:i + 1, dur:BREAK });
+  }
+  return out;
+}
+function totalOf(n) { return n * WORK + (n - 1) * BREAK; }
+
+function locate(secs, n) {
+  const segs = segments(n);
+  let acc = 0;
+  for (let i = 0; i < segs.length; i++) {
+    if (secs < acc + segs[i].dur) return { i:i, seg:segs[i], into:secs - acc };
+    acc += segs[i].dur;
+  }
+  return { i:-1, seg:null, into:0 };   // mission over
+}
+
+/* ── audio: three synthesized tactical signals, no files ─────── */
+let AC = null;
+function ac() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  return AC;
+}
+function voice(t0, freq, dur, o) {
+  o = o || {};
+  const c = ac(), osc = c.createOscillator(), g = c.createGain();
+  osc.type = o.type || 'sine';
+  osc.frequency.value = freq;
+  osc.detune.value = o.dtn || 0;
+  const gain = o.gain === undefined ? .16 : o.gain;
+  const atk  = o.atk  === undefined ? .02 : o.atk;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + atk);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g); g.connect(c.destination);
+  osc.start(t0); osc.stop(t0 + dur + .05);
+}
+function air(t0, dur, gain) {
+  const c = ac(), len = Math.ceil(c.sampleRate * dur), buf = c.createBuffer(1, len, c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const s = c.createBufferSource(); s.buffer = buf;
+  const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2100; f.Q.value = 1.2;
+  const g = c.createGain(); g.gain.value = gain;
+  s.connect(f); f.connect(g); g.connect(c.destination); s.start(t0);
+}
+/* 50 done → stand down. gentle, smooth, falling. */
+function sigWorkEnd() {
+  const t = ac().currentTime + .02;
+  air(t, .5, .035);
+  voice(t,     880,    1.5, {type:'sine',     gain:.13, atk:.03});
+  voice(t,     220,    1.7, {type:'triangle', gain:.07, atk:.05});
+  voice(t + .34, 587.33, 1.9, {type:'sine',   gain:.12, atk:.03, dtn:-4});
+  voice(t + .34, 146.83, 2.1, {type:'sine',   gain:.06, atk:.06});
+}
+/* break done → back on. crisper, rising, two pulses. */
+function sigBreakEnd() {
+  const t = ac().currentTime + .02;
+  voice(t,      659.25, .5,  {type:'triangle', gain:.11, atk:.006});
+  voice(t,      164.81, .6,  {type:'sine',     gain:.06, atk:.01});
+  voice(t + .2, 987.77, .9,  {type:'triangle', gain:.12, atk:.006});
+  voice(t + .2, 246.94, 1.0, {type:'sine',     gain:.06, atk:.02});
+  air(t + .2, .22, .04);
+}
+/* mission over → heavier, distinct, resolving. */
+function sigMissionEnd() {
+  const t = ac().currentTime + .02;
+  voice(t,      110,    3.2, {type:'sine',     gain:.09, atk:.08});
+  voice(t,      164.81, 3.0, {type:'triangle', gain:.05, atk:.10});
+  air(t, .8, .045);
+  voice(t + .05, 523.25, 1.1, {type:'sine', gain:.12, atk:.02});
+  voice(t + .42, 392.00, 1.3, {type:'sine', gain:.12, atk:.02});
+  voice(t + .84, 329.63, 2.6, {type:'sine', gain:.13, atk:.03});
+  voice(t + .84, 659.25, 2.4, {type:'sine', gain:.05, atk:.05, dtn:3});
+}
+function flash(silver) {
+  el.flash.classList.remove('go');
+  el.flash.classList.toggle('silver', !!silver);
+  void el.flash.offsetWidth;
+  el.flash.classList.add('go');
+}
+
+/* ── clock painting: fixed-width digit cells, zero jitter ────── */
+function paint(text) {
+  const box = el.clock;
+  const sig = text.replace(/[0-9]/g, '#');
+  if (box.dataset.sig !== sig) {
+    box.textContent = '';
+    for (const ch of text) {
+      const s = document.createElement('span');
+      s.className = /[0-9]/.test(ch) ? 'd' : 'c';
+      s.textContent = ch;
+      box.appendChild(s);
+    }
+    box.dataset.sig = sig;
+    return;
+  }
+  const k = box.children;
+  for (let i = 0; i < text.length; i++) if (k[i].textContent !== text[i]) k[i].textContent = text[i];
+}
+function mmss(s) {
+  s = Math.max(0, Math.ceil(s));
+  const m = Math.floor(s / 60);
+  return (m < 100 ? String(m).padStart(2, '0') : String(m)) + ':' + String(s % 60).padStart(2, '0');
+}
+function human(s) {
+  s = Math.max(0, Math.round(s));
+  const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  return h ? h + 'h ' + String(m).padStart(2, '0') + 'm' : m + 'm';
+}
+
+/* ── screens ─────────────────────────────────────────────────── */
+function show(which) {
+  el.obj.classList.toggle('on',     which === 'obj');
+  el.plan.classList.toggle('on',    which === 'plan');
+  el.run.classList.toggle('on',     which === 'run');
+  el.verdict.classList.toggle('on', which === 'verdict');
+  el.done.classList.toggle('on',    which === 'done');
+  el.auth.classList.toggle('on',    which === 'auth');
+  document.body.classList.toggle('running', which === 'run');
+}
+
+/* the sync link is the only place account state is ever shown */
+async function markSync() {
+  const s = await session();
+  el.toAuth.textContent = s ? 'Synced' : 'Sign in to sync';
+  el.toAuth.classList.toggle('live', !!s);
+}
+async function openAuth() {
+  const s = await session();
+  el.authMsg.textContent = 'Objectives sync across your devices';
+  el.authMsg.classList.remove('bad');
+  if (s) {
+    el.authWho.textContent = s.user.email || 'signed in';
+    el.authIn.hidden = false; el.authOut.hidden = true;
+  } else {
+    el.authIn.hidden = true;  el.authOut.hidden = false;
+    el.authPass.value = '';
+  }
+  show('auth');
+  if (!s) el.authEmail.focus();
+}
+async function signIn() {
+  const c = await supa();
+  if (!c) { el.authMsg.textContent = 'Sync unavailable offline'; el.authMsg.classList.add('bad'); return; }
+  const email = el.authEmail.value.trim(), pass = el.authPass.value;
+  if (!email || !pass) return;
+  el.authGo.disabled = true;
+  el.authMsg.classList.remove('bad');
+  el.authMsg.textContent = 'Signing in…';
+  try {
+    const r = await c.auth.signInWithPassword({ email: email, password: pass });
+    if (r.error) throw r.error;
+    el.authPass.value = '';
+    Store.adoptLocal();                 // offline work comes up with you
+    await Store.sync();
+    await renderObjectives();
+    await markSync();
+    show('obj');
+  } catch (e) {
+    el.authMsg.textContent = (e && e.message) ? e.message : 'Sign in failed';
+    el.authMsg.classList.add('bad');
+  }
+  el.authGo.disabled = false;
+}
+async function signOut() {
+  const c = await supa();
+  try { if (c) await c.auth.signOut(); } catch (e) {}
+  Store.wipeLocal();                    // never leave one account's list on screen for another
+  await renderObjectives();
+  await markSync();
+  route();
+}
+function setStatus(txt, live, rec) {
+  el.status.textContent = txt;
+  el.dot.classList.toggle('live', !!live);
+  document.body.classList.toggle('rec', !!rec);
+}
+
+/* ── objectives screen ───────────────────────────────────────── */
+const MARK = {
+  pending: '<svg viewBox="0 0 16 16"><path d="M5.5 3 10.5 8l-5 5"/></svg>',
+  done:    '<svg viewBox="0 0 16 16"><path d="M2.5 8.5 6 12 13.5 4"/></svg>',
+  failed:  '<svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg>'
+};
+function objRow(o) {
+  const settled = !isPending(o);
+  const wrap = document.createElement('div');
+  wrap.className = 'obj' + (settled ? ' settled' : '');
+
+  const pick = document.createElement('button');
+  pick.className = 'pick';
+  pick.disabled = settled;
+  const mark = document.createElement('span');
+  mark.className = 'mark' + (settled ? (o.verdict ? ' done' : ' failed') : '');
+  mark.innerHTML = settled ? (o.verdict ? MARK.done : MARK.failed) : MARK.pending;
+  const nm = document.createElement('span');
+  nm.className = 'nm';
+  nm.textContent = o.name;
+  pick.appendChild(mark); pick.appendChild(nm);
+  if (!settled) pick.onclick = function () { bindObjective(o); };
+
+  const del = document.createElement('button');
+  del.className = 'del';
+  del.innerHTML = '&times;';
+  del.setAttribute('aria-label', 'delete objective');
+  del.onclick = function () { Store.remove(o.id).then(renderObjectives); };
+
+  wrap.appendChild(pick); wrap.appendChild(del);
+  return wrap;
+}
+function renderObjectives() {
+  return Store.list().then(function (rows) {
+    const pend = rows.filter(isPending)
+                     .sort(function (a, b) { return a.created_at - b.created_at; });
+    const settled = rows.filter(function (o) { return !isPending(o); })
+                     .sort(function (a, b) { return (b.decided_at || 0) - (a.decided_at || 0); });
+    el.objList.textContent = '';
+    pend.forEach(function (o) { el.objList.appendChild(objRow(o)); });
+    if (settled.length) {
+      if (pend.length) {
+        const r = document.createElement('div');
+        r.className = 'settled-rule';
+        el.objList.appendChild(r);
+      }
+      settled.forEach(function (o) { el.objList.appendChild(objRow(o)); });
+    }
+    if (!rows.length) {
+      const e = document.createElement('div');
+      e.className = 'emptyline mk';
+      e.textContent = 'No objectives set';
+      el.objList.appendChild(e);
+    }
+    return rows;
+  });
+}
+
+/* clicking an objective carries its name into the plan screen */
+function bindObjective(o) {
+  objId = o.id;
+  el.name.value = o.name;
+  el.desigLbl.textContent = 'Objective';
+  setBlocks(0);
+  show('plan');
+  el.durIn.focus();
+}
+function freeMission() {
+  objId = null;
+  el.name.value = '';
+  el.desigLbl.textContent = 'Designation';
+  setBlocks(0);
+  show('plan');
+  el.name.focus();
+}
+
+/* ── plan screen ─────────────────────────────────────────────── */
+function setBlocks(n) {                 // n = 0 means "not chosen yet"
+  blocks = n;
+  el.durIn.value = n ? String(n) : '';
+  drawPlan();
+}
+/* the field is sized to the glyph actually drawn — "N" is wider than a digit, so a
+   ch-based width let it spill into the .50 */
+let measurer = null;
+function glyphWidth(s) {
+  const cs = getComputedStyle(el.durIn);
+  if (!measurer) measurer = document.createElement('canvas').getContext('2d');
+  measurer.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+  return measurer.measureText(s).width + (parseFloat(cs.letterSpacing) || 0) * s.length;
+}
+function drawPlan() {
+  const PAD = 6;                               // right padding, keeps it off the dot
+  el.durIn.style.width = Math.ceil(glyphWidth(el.durIn.value || 'N') + PAD + 2) + 'px';
+  el.durTotal.textContent = blocks
+    ? 'Total ' + human(blocks * 50 * 60 + (blocks - 1) * 5 * 60)
+    : 'Total —';
+  el.minus.disabled  = blocks <= 1;
+  el.plus.disabled   = blocks >= MAXB;
+  el.engage.disabled = !el.name.value.trim() || !blocks;
+}
+
+/* ── the owed verdict ────────────────────────────────────────── */
+function savePending(p) { try { localStorage.setItem(PENDING, JSON.stringify(p)); } catch (e) {} }
+function loadPending() {
+  try { return JSON.parse(localStorage.getItem(PENDING) || 'null'); } catch (e) { return null; }
+}
+function clearPending() { try { localStorage.removeItem(PENDING); } catch (e) {} }
+
+function askVerdict(p) {
+  el.vName.textContent = p.name;
+  document.title = 'MISSION ACCOMPLISHED ?';
+  setStatus('Debrief', false, false);
+  show('verdict');
+}
+function answer(ok) {
+  const p = loadPending();
+  if (!p) { route(); return; }
+  Store.setVerdict(p.objId, ok).then(function () {
+    clearPending();
+    route();
+  });
+}
+
+/* where the app lands when nothing is running */
+function route() {
+  return renderObjectives().then(function (rows) {
+    document.title = 'FOCUS TIMER';
+    setStatus('Planning', false, false);
+    if (rows.some(isPending)) { objId = null; show('obj'); el.objIn.value = ''; el.objAdd.disabled = true; }
+    else { freeMission(); }
+  });
+}
+
+/* ── engine ──────────────────────────────────────────────────── */
+function save() { try { localStorage.setItem(KEY, JSON.stringify(mission)); } catch (e) {} }
+function wipe() { try { localStorage.removeItem(KEY); } catch (e) {} }
+
+function start(name, n, boundId) {
+  let prev = 0;
+  try { prev = +localStorage.getItem(CNT) || 0; } catch (e) {}
+  const no = prev + 1;
+  try { localStorage.setItem(CNT, String(no)); } catch (e) {}
+
+  mission = { no:no, name:name, blocks:n, startedAt:Date.now(), objId: boundId || null };
+  save();
+  lastSeg = -1;
+  el.mNo.textContent   = String(no).padStart(2, '0');
+  el.mName.textContent = name;
+  show('run');
+  run(true);
+  if (!tick) tick = setInterval(run, 250);
+}
+
+function run(first) {
+  if (!mission) return;
+  const elapsed = (Date.now() - mission.startedAt) / 1000;
+  const at      = locate(elapsed, mission.blocks);
+
+  /* mission over */
+  if (at.i === -1) {
+    if (!first) { sigMissionEnd(); flash(false); }
+    finish();
+    return;
+  }
+
+  /* boundary crossed */
+  if (at.i !== lastSeg) {
+    if (!first && lastSeg >= 0) {
+      if (at.seg.kind === 'b') { sigWorkEnd();  flash(true);  }
+      else                     { sigBreakEnd(); flash(false); }
+    }
+    lastSeg = at.i;
+    const w = at.seg.kind === 'w';
+    el.tag.textContent = w ? ('W' + at.seg.block + '.50') : 'Recovery';
+    setStatus(w ? 'In progress' : 'Recovery', true, !w);
+  }
+
+  /* per-tick paint */
+  const left = at.seg.dur - at.into;
+  paint(mmss(left));
+  document.title = (at.seg.kind === 'w' ? 'W' + at.seg.block + '.50' : 'BREAK') + ' · ' + mmss(left);
+}
+
+function finish() {
+  if (tick) { clearInterval(tick); tick = null; }
+  const m = mission;
+  wipe();
+  mission = null;
+
+  /* an objective-backed mission owes a verdict — and the question waits
+     indefinitely, surviving a close, until it is answered */
+  if (m.objId && Store.get(m.objId)) {
+    const p = { objId:m.objId, name:m.name, no:m.no };
+    savePending(p);
+    askVerdict(p);
+    return;
+  }
+
+  const n = m.blocks;
+  el.dNo.textContent     = String(m.no).padStart(2, '0');
+  el.dName.textContent   = m.name;
+  el.dBlocks.textContent = String(n);
+  el.dMins.textContent   = String(n * 50);
+  el.dSpan.textContent   = human(n * 50 * 60 + (n - 1) * 5 * 60);
+  document.title = 'MISSION ' + String(m.no).padStart(2, '0') + ' · COMPLETE';
+  setStatus('Complete', false, false);
+  show('done');
+}
+
+/* ── boot: a verdict owed outranks everything, then a live mission ── */
+(async function boot() {
+  drawPlan();
+  markSync();
+
+  const owed = loadPending();
+  if (owed) { askVerdict(owed); Store.sync(); return; }
+
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  if (s && s.startedAt && s.blocks) {
+    mission = s;
+    if ((Date.now() - s.startedAt) / 1000 >= totalOf(s.blocks)) { finish(); return; }
+    el.mNo.textContent   = String(s.no).padStart(2, '0');
+    el.mName.textContent = s.name;
+    show('run');
+    lastSeg = -1;
+    run(true);                       // silent landing — no retroactive alarms
+    tick = setInterval(run, 250);
+    return;
+  }
+
+  /* nothing running: if we can sync, do it BEFORE choosing the greeting, so
+     objectives added on the phone decide what the desk shows. capped, because
+     a slow network must never hold the app hostage. */
+  route();
+  if (await session()) {
+    await Promise.race([Store.sync(), new Promise(function (r) { setTimeout(r, 2500); })]);
+  }
+})();
+
+/* ── wiring ──────────────────────────────────────────────────── */
+el.name.addEventListener('input', drawPlan);
+el.name.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter') return;
+  if (!blocks) el.durIn.focus();
+  else if (!el.engage.disabled) el.engage.click();
+});
+
+/* the block count is typed, not picked */
+el.durIn.addEventListener('input', function () {
+  const digits = el.durIn.value.replace(/[^0-9]/g, '').slice(0, 2);
+  if (!digits) { setBlocks(0); return; }
+  setBlocks(Math.min(MAXB, Math.max(1, parseInt(digits, 10))));
+});
+el.durIn.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && !el.engage.disabled) { el.engage.click(); return; }
+  if (e.key === 'ArrowUp')   { e.preventDefault(); setBlocks(Math.min(MAXB, (blocks || 0) + 1)); }
+  if (e.key === 'ArrowDown') { e.preventDefault(); setBlocks(Math.max(1, (blocks || 1) - 1)); }
+});
+el.durVal.onclick = function () { el.durIn.focus(); };
+
+el.minus.onclick = function () { if (blocks > 1)    setBlocks(blocks - 1); };
+el.plus.onclick  = function () { setBlocks(Math.min(MAXB, (blocks || 0) + 1)); };
+
+el.engage.onclick = function () {
+  const nm = el.name.value.trim();
+  if (!nm || !blocks) return;
+  try { ac().resume(); } catch (e) {}          // unlock audio on the gesture
+  start(nm.toUpperCase(), blocks, objId);
+};
+
+/* objectives */
+el.objIn.addEventListener('input', function () { el.objAdd.disabled = !el.objIn.value.trim(); });
+el.objIn.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && el.objIn.value.trim()) el.objAdd.click();
+});
+el.objAdd.onclick = function () {
+  const v = el.objIn.value.trim();
+  if (!v) return;
+  Store.add(v.toUpperCase()).then(function () {
+    el.objIn.value = '';
+    el.objAdd.disabled = true;
+    renderObjectives();
+    el.objIn.focus();
+  });
+};
+el.toPlan.onclick = freeMission;
+el.toObj.onclick  = function () {
+  renderObjectives().then(function () {
+    el.objIn.value = ''; el.objAdd.disabled = true;
+    show('obj');
+    Store.sync();                       // silent refresh on the way in
+  });
+};
+
+/* sync / account */
+el.toAuth.onclick    = openAuth;
+el.authBack.onclick  = function () { renderObjectives().then(function () { show('obj'); }); };
+el.authGo.onclick    = signIn;
+el.authOutBtn.onclick = signOut;
+el.authPass.addEventListener('keydown', function (e) { if (e.key === 'Enter') signIn(); });
+el.authEmail.addEventListener('keydown', function (e) { if (e.key === 'Enter') el.authPass.focus(); });
+
+/* keep the list fresh without ever showing a spinner */
+window.addEventListener('online', function () { Store.sync(); });
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden && !mission) Store.sync();
+});
+
+/* verdict */
+el.vYes.onclick = function () { answer(true); };
+el.vNo.onclick  = function () { answer(false); };
+
+/* debrief (free mission) */
+el.again.onclick = function () { route(); };
+el.close.onclick = function () {
+  window.close();
+  setTimeout(function () {
+    document.body.innerHTML =
+      '<div style="height:100%;display:grid;place-items:center;font-family:Barlow,sans-serif;' +
+      'font-size:10.5px;letter-spacing:.4em;text-transform:uppercase;color:#5c6369">' +
+      'Dismissed &mdash; close this window</div>';
+  }, 200);
+};
+
+/* a work block is a commitment: warn on exit while one is live */
+window.addEventListener('beforeunload', function (e) {
+  if (!mission) return;
+  const at = locate((Date.now() - mission.startedAt) / 1000, mission.blocks);
+  if (at.seg && at.seg.kind === 'w') { e.preventDefault(); e.returnValue = ''; return ''; }
+});
+
+/* the first measure can run before Barlow lands — re-measure once it has */
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawPlan);
+</script>
+</body>
+</html>
