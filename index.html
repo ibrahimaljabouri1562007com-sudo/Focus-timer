@@ -297,7 +297,7 @@ body.rec .status .dot{background:var(--silver)}
     <section class="screen" id="scObj">
       <div class="navline navrow">
         <button class="navlink" id="toPlan">Free mission &rarr;</button>
-        <button class="navlink" id="toAuth">Sign in to sync</button>
+        <button class="navlink synclink" id="toAuth">Sign in to sync</button>
       </div>
       <div class="head-rule"><div class="l"></div><div class="t">Objectives</div><div class="l"></div></div>
       <div class="objlist" id="objList"></div>
@@ -309,7 +309,7 @@ body.rec .status .dot{background:var(--silver)}
 
     <!-- ============ SCREEN : SYNC / SIGN IN ============ -->
     <section class="screen" id="scAuth">
-      <div class="navline"><button class="navlink" id="authBack">&larr; Objectives</button></div>
+      <div class="navline"><button class="navlink" id="authBack">&larr; Back</button></div>
       <div class="head-rule"><div class="l"></div><div class="t">Sync</div><div class="l"></div></div>
 
       <div id="authOut">
@@ -338,7 +338,10 @@ body.rec .status .dot{background:var(--silver)}
 
     <!-- ============ SCREEN : PLAN ============ -->
     <section class="screen" id="scPlan">
-      <div class="navline"><button class="navlink" id="toObj">&larr; Objectives</button></div>
+      <div class="navline navrow">
+        <button class="navlink" id="toObj">&larr; Objectives</button>
+        <button class="navlink synclink" id="toAuth2">Sign in to sync</button>
+      </div>
       <div class="head-rule"><div class="l"></div><div class="t">Mission Briefing</div><div class="l"></div></div>
 
       <div class="field">
@@ -756,11 +759,16 @@ function show(which) {
   document.body.classList.toggle('running', which === 'run');
 }
 
-/* the sync link is the only place account state is ever shown */
+/* the sync link is the only place account state is ever shown. it sits on BOTH
+   the objectives and plan screens — a first-time visitor with no objectives is
+   greeted by the plan screen, and must still be able to find sign-in. */
 async function markSync() {
   const s = await session();
-  el.toAuth.textContent = s ? 'Synced' : 'Sign in to sync';
-  el.toAuth.classList.toggle('live', !!s);
+  const links = document.querySelectorAll('.synclink');
+  for (let i = 0; i < links.length; i++) {
+    links[i].textContent = s ? 'Synced' : 'Sign in to sync';
+    links[i].classList.toggle('live', !!s);
+  }
 }
 async function openAuth() {
   const s = await session();
@@ -1109,9 +1117,9 @@ el.toObj.onclick  = function () {
   });
 };
 
-/* sync / account */
-el.toAuth.onclick    = openAuth;
-el.authBack.onclick  = function () { renderObjectives().then(function () { show('obj'); }); };
+/* sync / account — every sync link on every screen opens the same panel */
+document.querySelectorAll('.synclink').forEach(function (b) { b.onclick = openAuth; });
+el.authBack.onclick  = function () { route(); };   // lands wherever is right now
 el.authGo.onclick    = signIn;
 el.authOutBtn.onclick = signOut;
 el.authPass.addEventListener('keydown', function (e) { if (e.key === 'Enter') signIn(); });
