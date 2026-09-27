@@ -8,7 +8,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Focus">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2308090a'/%3E%3Ccircle cx='16' cy='17' r='9' fill='none' stroke='%23c9ced4' stroke-width='2'/%3E%3Cpath d='M16 12v5' stroke='%23e0132f' stroke-width='2' stroke-linecap='square'/%3E%3Cpath d='M12 4h8' stroke='%23c9ced4' stroke-width='2'/%3E%3C/svg%3E">
+<!-- the mark is the cadence: a dial 5/6 red for the 50, a quiet sixth for the 5 -->
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
@@ -37,6 +41,9 @@ body{
   font-family:var(--ui);
   overflow:hidden;
   -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;          /* iOS must not inflate text in landscape */
+  -webkit-tap-highlight-color:transparent;/* no grey flash box on tap */
+  overscroll-behavior:none;               /* no pull-to-refresh reload mid-mission */
 }
 /* ---- ground: vignette + scanline grain ---- */
 .ground{position:fixed;inset:0;pointer-events:none;z-index:0}
@@ -49,7 +56,13 @@ body{
   content:"";position:absolute;inset:0;opacity:.18;
   background:repeating-linear-gradient(to bottom,rgba(255,255,255,.018) 0 1px,transparent 1px 3px);
 }
-.frame{position:fixed;inset:14px;pointer-events:none;z-index:1}
+/* safe areas: the page is viewport-fit=cover and runs standalone from the
+   home screen, so the notch and home indicator must not eat the chrome */
+.frame{position:fixed;pointer-events:none;z-index:1;
+  top:calc(14px + env(safe-area-inset-top,0px));
+  right:calc(14px + env(safe-area-inset-right,0px));
+  bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  left:calc(14px + env(safe-area-inset-left,0px));}
 .frame i{position:absolute;width:14px;height:14px;border:1px solid var(--line)}
 .frame i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0}
 .frame i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0}
@@ -66,7 +79,9 @@ body{
 /* ---- top bar ---- */
 header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:22px 34px 12px;border-bottom:1px solid var(--line-soft);flex:0 0 auto;
+  padding:calc(22px + env(safe-area-inset-top,0px)) calc(34px + env(safe-area-inset-right,0px))
+          12px calc(34px + env(safe-area-inset-left,0px));
+  border-bottom:1px solid var(--line-soft);flex:0 0 auto;
 }
 .brand{display:flex;align-items:center}
 .brand span{font-family:var(--ui);font-size:12px;font-weight:500;letter-spacing:.26em;color:var(--dim);text-transform:uppercase}
@@ -75,7 +90,9 @@ header{
 .status .dot.live{animation:pulse 2.4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.18}}
 
-main{flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:10px 34px;min-height:0}
+main{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:0;
+  padding:10px calc(34px + env(safe-area-inset-right,0px))
+          calc(10px + env(safe-area-inset-bottom,0px)) calc(34px + env(safe-area-inset-left,0px));}
 .screen{display:none;width:100%;max-width:720px}
 .screen.on{display:block;animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -132,6 +149,7 @@ main{flex:1 1 auto;display:flex;align-items:center;justify-content:center;paddin
   font-family:var(--disp);font-size:22px;line-height:1;color:rgba(208,215,222,.38);transition:color .2s;
 }
 .obj .del:hover{color:var(--red-hot)}
+.obj .del.armed{color:#fff;background:var(--red);border-radius:2px}
 
 /* settled objectives sink and dim */
 .obj.settled{border-bottom-color:transparent}
@@ -261,8 +279,20 @@ body.rec .status .dot{background:var(--silver)}
 #flash.silver{box-shadow:inset 0 0 0 2px rgba(201,206,212,.8),inset 0 0 90px rgba(201,206,212,.14)}
 @keyframes fl{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
 
+/* touch devices get comfortable hit areas; the desktop layout is untouched */
+@media (pointer:coarse){
+  .navlink{min-height:44px;display:inline-flex;align-items:center}
+  .step,.objadd-btn{width:44px;height:44px}
+  .obj .del{min-width:44px;min-height:44px;padding:10px 0 10px 12px}
+  .obj .pick{min-height:56px}
+  .obj.settled .pick{min-height:48px}
+}
+
 @media (max-width:620px){
-  header,main{padding-left:20px;padding-right:20px}
+  header{padding-left:calc(20px + env(safe-area-inset-left,0px));
+         padding-right:calc(20px + env(safe-area-inset-right,0px))}
+  main{padding-left:calc(20px + env(safe-area-inset-left,0px));
+       padding-right:calc(20px + env(safe-area-inset-right,0px))}
   .mk{letter-spacing:.16em;font-size:11.5px}
   .dur{flex-wrap:wrap;gap:14px}
   .dur .meta{flex-basis:100%;text-align:left}
@@ -844,11 +874,22 @@ function objRow(o) {
   pick.appendChild(mark); pick.appendChild(nm);
   if (!settled) pick.onclick = function () { bindObjective(o); };
 
+  /* delete is destructive and syncs to every device, so it takes two taps:
+     the first arms it, the second commits. it disarms itself after 3s. */
   const del = document.createElement('button');
   del.className = 'del';
   del.innerHTML = '&times;';
   del.setAttribute('aria-label', 'delete objective');
-  del.onclick = function () { Store.remove(o.id).then(renderObjectives); };
+  let armed = null;
+  del.onclick = function () {
+    if (armed) {
+      clearTimeout(armed);
+      Store.remove(o.id).then(renderObjectives);
+      return;
+    }
+    del.classList.add('armed');
+    armed = setTimeout(function () { armed = null; del.classList.remove('armed'); }, 3000);
+  };
 
   wrap.appendChild(pick); wrap.appendChild(del);
   return wrap;
